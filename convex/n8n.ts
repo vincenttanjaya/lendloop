@@ -1,12 +1,14 @@
 import { v } from "convex/values";
 import { internal } from "./_generated/api";
 import { internalAction, internalMutation, internalQuery } from "./_generated/server";
+import { insertEventOnce } from "./lib/events";
 import { SIGNATURE_HEADER, TIMESTAMP_HEADER, sign } from "./lib/signature";
 
 export const LOAN_EVENTS = ["requested", "approved", "declined", "cancelled", "returned"] as const;
 export const loanEventValidator = v.union(...LOAN_EVENTS.map((event) => v.literal(event)));
 
 const RETRY_DELAYS_MS = [5_000, 30_000];
+const FETCH_TIMEOUT_MS = 10_000;
 const eventArgs = { loanId: v.id("loans"), event: loanEventValidator, actorId: v.id("users") };
 
 /** The outbound webhook payload: only what n8n needs to notify one person. */
@@ -54,24 +56,15 @@ export const recordNotification = internalMutation({
   args: { loanId: v.id("loans"), idempotencyKey: v.string(), message: v.string() },
   returns: v.null(),
   handler: async (ctx, { loanId, idempotencyKey, message }) => {
-    const existing = await ctx.db
-      .query("automationEvents")
-      .withIndex("by_key", (q) => q.eq("idempotencyKey", idempotencyKey))
-      .first();
-    if (!existing) {
-      await ctx.db.insert("automationEvents", {
-        loanId,
-        kind: "notification",
-        idempotencyKey,
-        message,
-        createdAt: Date.now(),
-      });
-    }
+    await insertEventOnce(ctx, { loanId, kind: "notification", idempotencyKey, message });
     return null;
   },
 });
 
-/** Posts a signed loan event to n8n; retries after 5 s and 30 s, then throws so the failure shows in the logs. */
+/**
+ * Posts a signed loan event to n8n; retries after 5 s and 30 s, then throws so the failure shows in the logs.
+ * Each attempt times out after 10 s, so a hung n8n also lands in the retry path instead of stalling the action.
+ */
 export const sendLoanEvent = internalAction({
   args: { ...eventArgs, attempt: v.optional(v.number()) },
   returns: v.null(),
@@ -90,28 +83,34 @@ export const sendLoanEvent = internalAction({
 
     const body = JSON.stringify(payload);
     const timestamp = String(Date.now());
+    const signature = await sign(secret, timestamp, body);
+    const abort = new AbortController();
+    const timer = setTimeout(() => abort.abort(), FETCH_TIMEOUT_MS);
+    let response: Response | null = null;
     let detail: string;
     try {
-      const response = await fetch(url, {
+      response = await fetch(url, {
         method: "POST",
-        headers: {
-          "content-type": "application/json",
-          [TIMESTAMP_HEADER]: timestamp,
-          [SIGNATURE_HEADER]: await sign(secret, timestamp, body),
-        },
+        headers: { "content-type": "application/json", [TIMESTAMP_HEADER]: timestamp, [SIGNATURE_HEADER]: signature },
         body,
+        signal: abort.signal,
       });
-      if (response.ok) {
-        await ctx.runMutation(internal.n8n.recordNotification, {
-          loanId,
-          idempotencyKey: `notify:${payload.eventId}`,
-          message: `Notified ${payload.recipient.name} (${event})`,
-        });
-        return null;
-      }
       detail = `HTTP ${response.status}`;
     } catch (error) {
       detail = error instanceof Error ? error.message : String(error);
+    } finally {
+      clearTimeout(timer);
+    }
+
+    // Outside the try: n8n has delivered, so a failed bookkeeping write must throw, not be retried as a failed
+    // delivery (n8n does not dedupe on eventId, so a retry would notify the recipient again).
+    if (response?.ok) {
+      await ctx.runMutation(internal.n8n.recordNotification, {
+        loanId,
+        idempotencyKey: `notify:${payload.eventId}`,
+        message: `Notified ${payload.recipient.name} (${event})`,
+      });
+      return null;
     }
 
     if (attempt < 3) {

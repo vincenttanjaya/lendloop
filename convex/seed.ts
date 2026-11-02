@@ -1,7 +1,5 @@
 import { internalMutation } from "./_generated/server";
-import { todayISO } from "./lib/dates";
-
-const DAY_MS = 86_400_000;
+import { DAY_MS, todayISO } from "./lib/dates";
 
 /** Demo data for a fresh deployment (`npx convex run seed:demo`); does nothing once any user exists. */
 export const demo = internalMutation({

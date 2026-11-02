@@ -284,6 +284,27 @@ test("sendLoanEvent schedules a retry on failure and throws after the third atte
   expect(await automationEvents(t)).toEqual([]);
 });
 
+test("sendLoanEvent aborts a hung n8n call after 10 s and schedules the retry", async () => {
+  const t = newTest();
+  const { overdueId, lenderId } = await seedOverdue(t);
+  const args = { loanId: overdueId, event: "approved", actorId: lenderId } as const;
+  // Accepts the request but never answers; settles only when aborted.
+  const fetchMock = vi.fn<typeof fetch>(
+    (_url, init) =>
+      new Promise((_resolve, reject) => init?.signal?.addEventListener("abort", () => reject(new Error("timed out")))),
+  );
+  vi.stubGlobal("fetch", fetchMock);
+
+  const run = t.action(internal.n8n.sendLoanEvent, args);
+  await vi.waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(1));
+  await vi.advanceTimersByTimeAsync(10_000);
+
+  expect(await run).toBeNull();
+  const scheduled = await t.run((ctx) => ctx.db.system.query("_scheduled_functions").collect());
+  expect(scheduled).toMatchObject([{ args: [{ ...args, attempt: 2 }] }]);
+  expect(await automationEvents(t)).toEqual([]);
+});
+
 test("sendLoanEvent is a no-op with a warning when the webhook URL is unset", async () => {
   const t = newTest();
   const { overdueId, lenderId } = await seedOverdue(t);

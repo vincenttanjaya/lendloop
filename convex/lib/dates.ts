@@ -1,3 +1,5 @@
+export const DAY_MS = 86_400_000;
+
 /** Today's date as "YYYY-MM-DD" in UTC. */
 export function todayISO(now: number = Date.now()): string {
   return new Date(now).toISOString().slice(0, 10);

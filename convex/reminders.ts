@@ -1,7 +1,10 @@
 import { v } from "convex/values";
 import { internalMutation, internalQuery } from "./_generated/server";
+import { DAY_MS } from "./lib/dates";
+import { insertEventOnce } from "./lib/events";
 
-const DAY_MS = 86_400_000;
+/** One reminder per loan per day: the feed (read) and the write-back (insert) must agree on this key. */
+const reminderKey = (loanId: string, date: string) => `reminder:${loanId}:${date}`;
 
 /** Approved loans past their end date that have not been reminded for `asOf` (feed for the n8n reminder workflow). */
 export const overdue = internalQuery({
@@ -25,7 +28,7 @@ export const overdue = internalQuery({
       loans.map(async (loan) => {
         const reminded = await ctx.db
           .query("automationEvents")
-          .withIndex("by_key", (q) => q.eq("idempotencyKey", `reminder:${loan._id}:${asOf}`))
+          .withIndex("by_key", (q) => q.eq("idempotencyKey", reminderKey(loan._id, asOf)))
           .first();
         const borrower = await ctx.db.get("users", loan.borrowerId);
         if (reminded || !borrower) return null;
@@ -56,19 +59,12 @@ export const record = internalMutation({
   handler: async (ctx, { loanId: rawLoanId, reminderDate, status, channel }) => {
     const loanId = ctx.db.normalizeId("loans", rawLoanId);
     if (!loanId || !(await ctx.db.get("loans", loanId))) return null;
-    const idempotencyKey = `reminder:${loanId}:${reminderDate}`;
-    const existing = await ctx.db
-      .query("automationEvents")
-      .withIndex("by_key", (q) => q.eq("idempotencyKey", idempotencyKey))
-      .first();
-    if (existing) return { duplicate: true };
-    await ctx.db.insert("automationEvents", {
+    const inserted = await insertEventOnce(ctx, {
       loanId,
       kind: "reminder",
-      idempotencyKey,
+      idempotencyKey: reminderKey(loanId, reminderDate),
       message: `Reminder ${status} via ${channel}`,
-      createdAt: Date.now(),
     });
-    return { duplicate: false };
+    return { duplicate: !inserted };
   },
 });
