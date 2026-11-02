@@ -163,3 +163,36 @@ test("create rejects an empty name and an overlong description", async () => {
   const toolId = await asAlice.mutation(api.tools.create, { ...drill, name: "  Cordless drill  " });
   expect(await t.run((ctx) => ctx.db.get("tools", toolId))).toMatchObject({ name: "Cordless drill" });
 });
+
+test("update rejects a bad name", async () => {
+  const t = newTest();
+  const { as: asAlice } = await signIn(t, alice);
+  const toolId = await asAlice.mutation(api.tools.create, drill);
+
+  for (const name of ["", "x".repeat(81)]) {
+    await expect(asAlice.mutation(api.tools.update, { toolId, ...drill, name })).rejects.toThrow(
+      "Name must be 1–80 characters",
+    );
+  }
+  await asAlice.mutation(api.tools.update, { toolId, ...drill, name: "x".repeat(80) });
+  expect((await t.run((ctx) => ctx.db.get("tools", toolId)))?.name).toHaveLength(80);
+});
+
+test("update on a missing tool is Not found", async () => {
+  const t = newTest();
+  const { as: asAlice } = await signIn(t, alice);
+  const toolId = await asAlice.mutation(api.tools.create, drill);
+  await t.run((ctx) => ctx.db.delete("tools", toolId));
+
+  await expect(asAlice.mutation(api.tools.update, { toolId, ...drill })).rejects.toThrow("Not found");
+});
+
+test("remove by a non-owner is Forbidden", async () => {
+  const t = newTest();
+  const { as: asAlice } = await signIn(t, alice);
+  const { as: asBob } = await signIn(t, bob);
+  const toolId = await asAlice.mutation(api.tools.create, drill);
+
+  await expect(asBob.mutation(api.tools.remove, { toolId })).rejects.toThrow("Forbidden");
+  expect(await t.run((ctx) => ctx.db.get("tools", toolId))).not.toBeNull();
+});
