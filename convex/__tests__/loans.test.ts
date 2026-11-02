@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, expect, test, vi } from "vitest";
-import { api } from "../_generated/api";
+import { api, internal } from "../_generated/api";
 import type { Id } from "../_generated/dataModel";
 import { admin, alice, bob, newTest, signIn, type TestConvex } from "./test.setup";
 
@@ -231,16 +231,30 @@ test("mine and incoming return the right loans with names, overdue flag and acti
   expect((await asBob.query(api.loans.mine, {}))[0]).toMatchObject({ _id: activeId, isOverdue: true });
 });
 
-test("remove refuses a tool on loan and cancels pending requests otherwise", async () => {
+test("approve refuses a request whose end date has passed; decline still works", async () => {
+  const { t, asAlice, asBob, asCarol, drillId } = await setup();
+  const bobLoan = await requestDrill(asBob, drillId);
+  const carolLoan = await requestDrill(asCarol, drillId);
+  await asAlice.mutation(api.loans.approve, { loanId: bobLoan });
+
+  // Carol's request waits behind Bob's loan until after its own end date (2026-11-05).
+  vi.setSystemTime(Date.parse("2026-11-06T12:00:00Z"));
+  await asBob.mutation(api.loans.markReturned, { loanId: bobLoan });
+  await expect(asAlice.mutation(api.loans.approve, { loanId: carolLoan })).rejects.toThrow(
+    "This request's dates have passed",
+  );
+  await asAlice.mutation(api.loans.decline, { loanId: carolLoan });
+  expect(await loanOf(t, carolLoan)).toMatchObject({ status: "declined" });
+});
+
+test("an owner can't remove a tool on loan; removing cancels pending requests", async () => {
   const { t, asAlice, asBob, asCarol, asAdmin, adminId, drillId } = await setup();
   const returnedId = await requestDrill(asBob, drillId);
   await asAlice.mutation(api.loans.approve, { loanId: returnedId });
 
-  for (const as of [asAlice, asAdmin]) {
-    await expect(as.mutation(api.tools.remove, { toolId: drillId })).rejects.toThrow(
-      "Tool is on loan; mark it returned first",
-    );
-  }
+  await expect(asAlice.mutation(api.tools.remove, { toolId: drillId })).rejects.toThrow(
+    "Tool is on loan; mark it returned first",
+  );
 
   await asBob.mutation(api.loans.markReturned, { loanId: returnedId });
   const pendingId = await requestDrill(asCarol, drillId);
@@ -250,4 +264,18 @@ test("remove refuses a tool on loan and cancels pending requests otherwise", asy
   expect(await loanOf(t, pendingId)).toMatchObject({ status: "cancelled" });
   expect(await loanOf(t, returnedId)).toMatchObject({ status: "returned", toolName: "Cordless drill" });
   expect((await scheduledEvents(t)).at(-1)).toEqual({ loanId: pendingId, event: "cancelled", actorId: adminId });
+});
+
+test("an admin can remove a tool on loan, which cancels the loan and notifies the borrower", async () => {
+  const { t, asAlice, asBob, asAdmin, adminId, drillId } = await setup();
+  const loanId = await requestDrill(asBob, drillId);
+  await asAlice.mutation(api.loans.approve, { loanId });
+
+  expect(await asAdmin.mutation(api.tools.remove, { toolId: drillId })).toBeNull();
+
+  expect(await t.run((ctx) => ctx.db.get("tools", drillId))).toBeNull();
+  expect(await loanOf(t, loanId)).toMatchObject({ status: "cancelled" });
+  expect((await scheduledEvents(t)).at(-1)).toEqual({ loanId, event: "cancelled", actorId: adminId });
+  const event = await t.query(internal.n8n.loadLoanEvent, { loanId, event: "cancelled", actorId: adminId });
+  expect(event?.recipient.name).toBe("Bob");
 });

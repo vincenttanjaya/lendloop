@@ -1,9 +1,8 @@
 import { ConvexError, v } from "convex/values";
-import type { Id } from "./_generated/dataModel";
-import { mutation, query, type MutationCtx, type QueryCtx } from "./_generated/server";
+import { mutation, query } from "./_generated/server";
 import { categoryValidator, conditionValidator } from "./constants";
 import { isAdminClerkId, requireToolOwner, requireUser } from "./lib/auth";
-import { setLoanStatus } from "./loans";
+import { isToolAvailable, setLoanStatus } from "./loans";
 
 export const MAX_TOOLS_PER_OWNER = 50;
 
@@ -20,17 +19,6 @@ function cleanText(fields: { name: string; description: string }) {
   if (name.length < 1 || name.length > 80) throw new ConvexError("Name must be 1–80 characters");
   if (description.length > 500) throw new ConvexError("Description must be at most 500 characters");
   return { name, description };
-}
-
-/** A tool is available iff it has no approved loan. */
-export async function isToolAvailable(ctx: QueryCtx | MutationCtx, toolId: Id<"tools">): Promise<boolean> {
-  // ponytail: scans this tool's loan history; add a ["toolId", "status"] index if tools accumulate many loans.
-  const approved = await ctx.db
-    .query("loans")
-    .withIndex("by_tool", (q) => q.eq("toolId", toolId))
-    .filter((q) => q.eq(q.field("status"), "approved"))
-    .first();
-  return approved === null;
 }
 
 /** Signed-out view: available tools with only the fields safe to show anyone. */
@@ -108,16 +96,20 @@ export const remove = mutation({
     const user = await requireUser(ctx);
     const tool = await ctx.db.get("tools", toolId);
     if (!tool) throw new ConvexError("Not found");
-    if (tool.ownerId !== user._id && !isAdminClerkId(user.clerkId)) throw new ConvexError("Forbidden");
+    const isAdmin = isAdminClerkId(user.clerkId);
+    if (tool.ownerId !== user._id && !isAdmin) throw new ConvexError("Forbidden");
     const loans = await ctx.db
       .query("loans")
       .withIndex("by_tool", (q) => q.eq("toolId", toolId))
       .collect();
-    if (loans.some((loan) => loan.status === "approved")) {
+    // The owner takes the tool back first; an admin can remove any listing, which also ends its active loan.
+    if (!isAdmin && loans.some((loan) => loan.status === "approved")) {
       throw new ConvexError("Tool is on loan; mark it returned first");
     }
     for (const loan of loans) {
-      if (loan.status === "pending") await setLoanStatus(ctx, loan._id, "cancelled", user._id);
+      if (loan.status === "pending" || loan.status === "approved") {
+        await setLoanStatus(ctx, loan._id, "cancelled", user._id);
+      }
     }
     // Loans keep their own toolName, so history still reads correctly once the tool is gone.
     await ctx.db.delete("tools", toolId);

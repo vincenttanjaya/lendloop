@@ -98,13 +98,13 @@ test("a stale stored admin role is not trusted", async () => {
   expect(await t.run((ctx) => ctx.db.get("tools", toolId))).not.toBeNull();
 });
 
-test("JWT names are trimmed, capped at 80 chars and fall back to Neighbor", async () => {
+test("JWT names are trimmed, capped at 80 chars and fall back to Neighbor plus an id suffix", async () => {
   const t = newTest();
   const { userId: longId } = await signIn(t, { subject: "user_long", name: "  " + "x".repeat(100) + "  " });
-  const { userId: blankId } = await signIn(t, { subject: "user_blank", name: "   " });
+  const { userId: blankId } = await signIn(t, { subject: "user_2abcWXYZ", name: "   " });
 
   expect((await t.run((ctx) => ctx.db.get("users", longId)))?.name).toBe("x".repeat(80));
-  expect((await t.run((ctx) => ctx.db.get("users", blankId)))?.name).toBe("Neighbor");
+  expect((await t.run((ctx) => ctx.db.get("users", blankId)))?.name).toBe("Neighbor WXYZ");
 });
 
 test("an owner cannot list more than 50 tools", async () => {

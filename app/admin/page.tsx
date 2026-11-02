@@ -41,7 +41,7 @@ export default function AdminPage() {
                 </span>
                 <ActionButton
                   label="Remove"
-                  confirmText={`Remove "${tool.name}"? Pending requests for it will be cancelled.`}
+                  confirmText={`Remove "${tool.name}"? Its pending requests and any active loan will be cancelled.`}
                   onClick={() => remove({ toolId: tool._id })}
                 />
               </li>

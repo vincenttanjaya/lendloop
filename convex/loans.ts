@@ -5,7 +5,6 @@ import { mutation, query, type MutationCtx, type QueryCtx } from "./_generated/s
 import type { LoanStatus } from "./constants";
 import { requireUser } from "./lib/auth";
 import { isISODate, todayISO } from "./lib/dates";
-import { isToolAvailable } from "./tools";
 
 export type LoanView = Doc<"loans"> & {
   borrowerName: string;
@@ -32,6 +31,17 @@ export async function toLoanView(ctx: QueryCtx, loan: Doc<"loans">): Promise<Loa
     isOverdue: loan.status === "approved" && loan.endDate < todayISO(),
     activity: events.map(({ kind, message, createdAt }) => ({ kind, message, createdAt })),
   };
+}
+
+/** A tool is available iff it has no approved loan. */
+export async function isToolAvailable(ctx: QueryCtx | MutationCtx, toolId: Id<"tools">): Promise<boolean> {
+  // ponytail: scans this tool's loan history; add a ["toolId", "status"] index if tools accumulate many loans.
+  const approved = await ctx.db
+    .query("loans")
+    .withIndex("by_tool", (q) => q.eq("toolId", toolId))
+    .filter((q) => q.eq(q.field("status"), "approved"))
+    .first();
+  return approved === null;
 }
 
 /** Every status change goes through here: bump updatedAt, then tell n8n. */
@@ -105,6 +115,8 @@ export const approve = mutation({
   handler: async (ctx, { loanId }) => {
     const { user, loan } = await loanForTransition(ctx, loanId, ["lender"], "pending");
     if (!(await isToolAvailable(ctx, loan.toolId))) throw new ConvexError("Tool is already on loan");
+    // A request can wait past its dates (e.g. behind another loan); approving it then would start out overdue.
+    if (loan.endDate < todayISO()) throw new ConvexError("This request's dates have passed");
     await setLoanStatus(ctx, loanId, "approved", user._id);
     return null;
   },
