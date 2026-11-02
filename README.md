@@ -392,6 +392,8 @@ The suites go through the public Convex API wherever they can, with signed-in id
 | `tools.test.ts` | `users.ensure` upsert and admin role from `ADMIN_CLERK_IDS`; sign-in required; `listPublic` returns exactly `_id, name, category` and hides tools on loan; `list` availability, ownership, *Trusted Lender* flag and category filter; `mine`; non-owners can't update or remove; admins can remove any tool; name and description limits |
 | `loans.test.ts` | `request` creates a pending loan and schedules `requested`; every `request` rejection (own tool, bad dates, end before start, past end, tool on loan, duplicate pending); only the lender approves or declines; only the borrower cancels; lender or borrower returns; illegal state transitions; availability flips on approve and return; `mine`/`incoming` with names, overdue flag and activity; `tools.remove` refuses a tool on loan and cancels pending requests |
 | `admin.test.ts` | Non-admins, including a stored `role: "admin"` without the env var, get `Forbidden` on every admin function; admins see all loans and tools; trusted-lender toggle; `seed.demo` runs once |
+| `auth.test.ts` | Table-driven: every non-public Convex function rejects anonymous callers with `Sign in required`, with a guard that fails if a new public function is missing from the table; `listPublic` works anonymously; a stored `role: "admin"` not listed in `ADMIN_CLERK_IDS` is `Forbidden`; JWT names are trimmed, capped at 80 characters and fall back to "Neighbor"; the 51st tool per owner is rejected |
+| `lib/__tests__/format.test.ts` | Date-range and relative-time formatting used by the UI |
 | `integration.test.ts` | `sign`/`verify` against a pinned Node `createHmac` vector, plus mismatch, stale and missing headers; `GET /api/overdue` returns 401 when unsigned or wrongly signed, returns only the minimal fields, and skips loans already reminded; `POST /api/reminders` is idempotent, returns 400 for a bad body and 404 for an unknown loan; `sendLoanEvent` posts a signed minimal payload and records the notification, picks the right recipient per event, retries after 5 s and 30 s and then throws, warns and skips without a URL, and throws without a secret |
 
 ### End-to-end n8n verification
@@ -426,7 +428,22 @@ The closed-port failure was also fired by the real 09:00 Schedule Trigger inside
 
 **Caveat:** under `n8n execute` (the CLI), the error workflow is started without being awaited, so its alert line appears only some of the time. The CLI still exits 1 with the full error. Server-side runs (webhook and schedule) don't have this race.
 
-<!-- E2E: to be confirmed from wave3-E-report -->
+**Live run against the real Convex functions**
+
+The same stack was then run against the real backend: `npx convex dev` (anonymous local deployment, ports 3210/3211), `npx convex run seed:demo`, and the committed compose file and `n8n/import.sh`, with one shared secret on both sides.
+
+| Check | Result |
+|---|---|
+| `n8n execute --id lendloop-overdue-reminders`, first run | Succeeds; `[LendLoop reminder] Alice Four-person tent 3 days overdue`; write-back `{"ok":true,"duplicate":false}`; exactly one `reminder:` row in `automationEvents` |
+| Same command, second run | Succeeds; the feed is `loans: []`; still exactly one row |
+| Signed replay of the same write-back | `{"ok":true,"duplicate":true}`; tampered, stale, unknown-loan and bad-date requests get 401, 401, 404 and 400; still one row |
+| The committed daily Schedule Trigger, inside the server process | Fired on schedule (timezone override to bring 09:00 local within the hour), logged the reminder, wrote exactly one row, and re-armed for the next day |
+| `internal.n8n.sendLoanEvent` for the seeded pending loan | `[LendLoop notify] user_alice Hi Alice, Bob asked to borrow your Cordless drill …` in `docker compose logs`; one `notify:` row. Sending it again: n8n logs again, Convex still has one row |
+| The real mutations (`approve`, `markReturned`, `request`, `cancel`, `tools.remove`) via `npx convex run --identity` | Each produced one notification to the right recipient and one `notify:` row |
+| `N8N_LOAN_EVENT_WEBHOOK_URL` on a closed port | Attempts at +0 s, +5 s and +30 s, then `n8n webhook failed after 3 attempts: … Connection refused` in the Convex log and `state: failed` in `_scheduled_functions` |
+| `CONVEX_SITE_URL` on a closed port | *Fetch overdue loans* tries 3 times, the run exits 1, and the error workflow logs `[LendLoop automation error] … "lastNode":"Fetch overdue loans"` |
+
+That run caught one real bug: the `cancelled` message read "cancelled their request for your tool" even when a lender removed a listing and the borrower was the recipient. The template is now direction-neutral, like `returned`.
 
 ## Running this in production (what I would change)
 
