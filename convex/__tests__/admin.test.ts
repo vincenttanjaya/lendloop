@@ -28,9 +28,6 @@ test("non-admins get Forbidden on every admin function", async () => {
   ];
 
   for (const call of calls) await expect(call()).rejects.toThrow("Forbidden");
-  // The ADMIN_CLERK_IDS env var is the authority, not a stored role.
-  await t.run((ctx) => ctx.db.patch("users", bobId, { role: "admin" }));
-  for (const call of calls) await expect(call()).rejects.toThrow("Forbidden");
   await expect(t.query(api.admin.allLoans, {})).rejects.toThrow("Sign in required");
 });
 

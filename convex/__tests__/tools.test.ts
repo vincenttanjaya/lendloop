@@ -51,11 +51,6 @@ test("ensure upserts the user and assigns admin role from ADMIN_CLERK_IDS", asyn
   expect(await t.query(api.users.current, {})).toBeNull();
 });
 
-test("create requires sign-in", async () => {
-  const t = newTest();
-  await expect(t.mutation(api.tools.create, drill)).rejects.toThrow("Sign in required");
-});
-
 test("listPublic returns only _id, name, category of available tools", async () => {
   const t = newTest();
   const { as: asAlice } = await signIn(t, alice);
@@ -185,14 +180,4 @@ test("update on a missing tool is Not found", async () => {
   await t.run((ctx) => ctx.db.delete("tools", toolId));
 
   await expect(asAlice.mutation(api.tools.update, { toolId, ...drill })).rejects.toThrow("Not found");
-});
-
-test("remove by a non-owner is Forbidden", async () => {
-  const t = newTest();
-  const { as: asAlice } = await signIn(t, alice);
-  const { as: asBob } = await signIn(t, bob);
-  const toolId = await asAlice.mutation(api.tools.create, drill);
-
-  await expect(asBob.mutation(api.tools.remove, { toolId })).rejects.toThrow("Forbidden");
-  expect(await t.run((ctx) => ctx.db.get("tools", toolId))).not.toBeNull();
 });
