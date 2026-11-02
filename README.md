@@ -252,9 +252,9 @@ Rules:
 
 ```
 loans.request (borrower) ─▶ pending ─approve (lender; tool must be free)─▶ approved ─markReturned (lender or borrower)─▶ returned
-                              ├─decline (lender)───────────────▶ declined  │
-                              └─cancel (borrower), or tools.remove─▶ cancelled └─tools.remove (admin)─▶ cancelled
-                                (removing a tool cancels its pending requests)
+                              ├─decline (lender)───────────────────────▶ declined
+                              └─cancel (borrower), or tools.remove ────▶ cancelled
+                                (removing a tool cancels its pending requests; an admin removing a tool that is on loan also cancels that loan)
 ```
 
 `request` runs these checks in order:
