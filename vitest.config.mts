@@ -4,7 +4,7 @@ export default defineConfig({
   test: {
     environment: "edge-runtime",
     server: { deps: { inline: ["convex-test"] } },
-    include: ["**/*.test.ts"],
-    exclude: ["node_modules/**", ".next/**"],
+    include: ["convex/**/*.test.ts"],
+    unstubEnvs: true,
   },
 });

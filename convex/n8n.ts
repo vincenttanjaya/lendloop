@@ -30,7 +30,8 @@ export const loadLoanEvent = internalQuery({
     const loan = await ctx.db.get("loans", loanId);
     if (!loan) return null;
     const toLender =
-      event === "requested" || event === "cancelled" || (event === "returned" && actorId === loan.borrowerId);
+      event === "requested" ||
+      ((event === "cancelled" || event === "returned") && actorId === loan.borrowerId);
     const [recipient, actor] = await Promise.all([
       ctx.db.get("users", toLender ? loan.lenderId : loan.borrowerId),
       ctx.db.get("users", actorId),

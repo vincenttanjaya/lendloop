@@ -43,7 +43,7 @@ export async function requireToolOwner(
 export async function getOrCreateUser(ctx: MutationCtx): Promise<Doc<"users">> {
   const identity = await ctx.auth.getUserIdentity();
   if (!identity) throw new ConvexError("Sign in required");
-  const name = identity.name ?? identity.nickname ?? "Neighbor";
+  const name = (identity.name || identity.nickname || "").trim().slice(0, 80) || "Neighbor";
   const role = isAdminClerkId(identity.subject) ? "admin" : "user";
 
   const existing = await getUser(ctx);

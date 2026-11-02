@@ -5,6 +5,8 @@ import { categoryValidator, conditionValidator } from "./constants";
 import { isAdminClerkId, requireToolOwner, requireUser } from "./lib/auth";
 import { setLoanStatus } from "./loans";
 
+export const MAX_TOOLS_PER_OWNER = 50;
+
 const toolFields = {
   name: v.string(),
   category: categoryValidator,
@@ -84,6 +86,9 @@ export const create = mutation({
   args: toolFields,
   handler: async (ctx, fields) => {
     const user = await requireUser(ctx);
+    // ponytail: hard cap so one account cannot bloat the public board past Convex read limits.
+    const owned = await ctx.db.query("tools").withIndex("by_owner", (q) => q.eq("ownerId", user._id)).collect();
+    if (owned.length >= MAX_TOOLS_PER_OWNER) throw new ConvexError(`You can list at most ${MAX_TOOLS_PER_OWNER} tools`);
     return await ctx.db.insert("tools", { ...fields, ...cleanText(fields), ownerId: user._id });
   },
 });

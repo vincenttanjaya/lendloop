@@ -256,6 +256,7 @@ test("loadLoanEvent picks the recipient for each event", async () => {
 
   expect(await recipientOf("requested", borrowerId)).toBe("Alice");
   expect(await recipientOf("cancelled", borrowerId)).toBe("Alice");
+  expect(await recipientOf("cancelled", lenderId)).toBe("Bob");
   expect(await recipientOf("approved")).toBe("Bob");
   expect(await recipientOf("declined")).toBe("Bob");
   expect(await recipientOf("returned", lenderId)).toBe("Bob");
