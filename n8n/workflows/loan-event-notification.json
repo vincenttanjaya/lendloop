@@ -1,5 +1,5 @@
 {
-  "updatedAt": "2026-11-02T14:10:32.000Z",
+  "updatedAt": "2026-11-02T15:17:21.000Z",
   "createdAt": "2026-11-02T14:02:26.901Z",
   "id": "lendloop-loan-event-notification",
   "name": "LendLoop - Loan event notification",
@@ -83,7 +83,7 @@
       ],
       "parameters": {
         "mode": "runOnceForEachItem",
-        "jsCode": "// Uses only the fields the message needs; nothing else from the payload leaves this node.\nconst { event, toolName, startDate, endDate, actorName, recipient } = $json.payload;\nconst dates = `${startDate} to ${endDate}`;\nconst templates = {\n  requested: `${actorName} asked to borrow your ${toolName} (${dates}).`,\n  approved: `${actorName} approved your request for the ${toolName} (${dates}).`,\n  declined: `${actorName} declined your request for the ${toolName} (${dates}).`,\n  cancelled: `${actorName} cancelled their request for your ${toolName} (${dates}).`,\n  returned: `${actorName} marked the ${toolName} as returned.`,\n};\nconst body = templates[event];\nif (!body) throw new Error(`Unknown loan event: ${event}`);\nreturn { json: { to: recipient.clerkId, message: `Hi ${recipient.name}, ${body}` } };"
+        "jsCode": "// Uses only the fields the message needs; nothing else from the payload leaves this node.\nconst { event, toolName, startDate, endDate, actorName, recipient } = $json.payload;\nconst dates = `${startDate} to ${endDate}`;\nconst templates = {\n  requested: `${actorName} asked to borrow your ${toolName} (${dates}).`,\n  approved: `${actorName} approved your request for the ${toolName} (${dates}).`,\n  declined: `${actorName} declined your request for the ${toolName} (${dates}).`,\n  // cancelled and returned go to whichever party did not act (lender or borrower), so they read both ways.\n  cancelled: `${actorName} cancelled the request for the ${toolName} (${dates}).`,\n  returned: `${actorName} marked the ${toolName} as returned.`,\n};\nconst body = templates[event];\nif (!body) throw new Error(`Unknown loan event: ${event}`);\nreturn { json: { to: recipient.clerkId, message: `Hi ${recipient.name}, ${body}` } };"
       }
     },
     {
@@ -207,29 +207,29 @@
   "meta": null,
   "nodeGroups": [],
   "pinData": null,
-  "versionId": "a107bb8f-3ff6-4f2a-9165-b6a89c3d88b7",
-  "activeVersionId": "a107bb8f-3ff6-4f2a-9165-b6a89c3d88b7",
-  "versionCounter": 1,
+  "versionId": "7968b3c5-d529-4d19-b9e8-45f30b0cfd12",
+  "activeVersionId": "7968b3c5-d529-4d19-b9e8-45f30b0cfd12",
+  "versionCounter": 2,
   "triggerCount": 1,
   "sourceWorkflowId": null,
   "tags": [],
   "shared": [
     {
-      "updatedAt": "2026-11-02T14:06:38.680Z",
-      "createdAt": "2026-11-02T14:06:38.680Z",
+      "updatedAt": "2026-11-02T15:12:10.430Z",
+      "createdAt": "2026-11-02T15:12:10.430Z",
       "role": "workflow:owner",
       "workflowId": "lendloop-loan-event-notification",
-      "projectId": "UnWw2NPeZwSEL2ql",
+      "projectId": "BD5jdq4ditw06FFw",
       "project": {
-        "updatedAt": "2026-11-02T14:06:15.047Z",
-        "createdAt": "2026-11-02T14:06:15.047Z",
-        "id": "UnWw2NPeZwSEL2ql",
+        "updatedAt": "2026-11-02T15:11:59.772Z",
+        "createdAt": "2026-11-02T15:11:59.772Z",
+        "id": "BD5jdq4ditw06FFw",
         "name": "Unnamed Project",
         "type": "personal",
         "icon": null,
         "description": null,
         "customTelemetryTags": [],
-        "creatorId": "67c76b3d-8814-47fc-844c-fe8caa0b4ab9"
+        "creatorId": "4765c3ff-5375-4550-8e52-492c83d06aa2"
       }
     }
   ],
