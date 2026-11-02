@@ -15,6 +15,17 @@ export function EnsureUser() {
   const { isLoading, isAuthenticated } = useConvexAuth();
   const ensure = useMutation(api.users.ensure);
   const [failed, setFailed] = useState(false);
+  const [stuck, setStuck] = useState(false);
+  // Convex accepts the Clerk token a moment after sign-in, so a mismatch only counts once it has lasted a while.
+  const mismatch = !!isSignedIn && !isLoading && !isAuthenticated;
+  useEffect(() => {
+    if (!mismatch) return;
+    const t = setTimeout(() => setStuck(true), 5000);
+    return () => {
+      clearTimeout(t);
+      setStuck(false);
+    };
+  }, [mismatch]);
   useEffect(() => {
     if (!isAuthenticated) return;
     ensure().then(
@@ -26,7 +37,7 @@ export function EnsureUser() {
     );
   }, [isAuthenticated, ensure]);
 
-  if (!failed && !(isSignedIn && !isLoading && !isAuthenticated)) return null;
+  if (!isSignedIn || !(failed || stuck)) return null;
   return (
     <div className="mx-auto max-w-3xl px-4 pt-4">
       <p role="alert" className="rounded-md bg-red-50 px-4 py-3 text-sm text-red-800">
