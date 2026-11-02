@@ -14,7 +14,10 @@ import type {
   FunctionReference,
 } from "convex/server";
 import type * as constants from "../constants.js";
+import type * as lib_auth from "../lib/auth.js";
 import type * as lib_dates from "../lib/dates.js";
+import type * as tools from "../tools.js";
+import type * as users from "../users.js";
 
 /**
  * A utility for referencing Convex functions in your app's API.
@@ -26,7 +29,10 @@ import type * as lib_dates from "../lib/dates.js";
  */
 declare const fullApi: ApiFromModules<{
   constants: typeof constants;
+  "lib/auth": typeof lib_auth;
   "lib/dates": typeof lib_dates;
+  tools: typeof tools;
+  users: typeof users;
 }>;
 export declare const api: FilterApi<
   typeof fullApi,
