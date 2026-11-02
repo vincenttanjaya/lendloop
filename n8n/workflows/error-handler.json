@@ -1,0 +1,109 @@
+{
+  "updatedAt": "2026-11-02T14:10:31.000Z",
+  "createdAt": "2026-11-02T14:02:26.799Z",
+  "id": "lendloop-error-handler",
+  "name": "LendLoop - Error handler",
+  "description": null,
+  "active": true,
+  "isArchived": false,
+  "nodes": [
+    {
+      "id": "d38a8ffc-3c46-40a1-8a17-c5e7683dfefb",
+      "name": "Error Trigger",
+      "type": "n8n-nodes-base.errorTrigger",
+      "typeVersion": 1,
+      "position": [
+        0,
+        0
+      ],
+      "parameters": {}
+    },
+    {
+      "id": "a1c3e5f7-0b2d-4c6e-8f10-2a4b6c8d0e12",
+      "name": "Format",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        220,
+        0
+      ],
+      "parameters": {
+        "jsCode": "const { workflow, execution, trigger } = $json;\nreturn [{ json: {\n  workflow: workflow?.name ?? 'unknown',\n  executionId: execution?.id ?? null,\n  error: execution?.error?.message ?? trigger?.error?.message ?? 'unknown error',\n  lastNode: execution?.lastNodeExecuted ?? null,\n} }];"
+      }
+    },
+    {
+      "id": "b2d4f6a8-1c3e-4d5f-9a21-3b5c7d9e1f23",
+      "name": "Mock alert",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        440,
+        0
+      ],
+      "parameters": {
+        "jsCode": "// ponytail: mock alert. Swap this node for Slack/PagerDuty/email to page someone for real.\n// console.log, not console.error: the Code task runner forwards only console.log to n8n's stdout.\nconsole.log('[LendLoop automation error]', JSON.stringify($json));\nreturn [{ json: { alerted: true } }];"
+      }
+    }
+  ],
+  "connections": {
+    "Error Trigger": {
+      "main": [
+        [
+          {
+            "node": "Format",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Format": {
+      "main": [
+        [
+          {
+            "node": "Mock alert",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "staticData": null,
+  "meta": null,
+  "nodeGroups": [],
+  "pinData": null,
+  "versionId": "4eed9c7c-787c-44c3-8055-390a665873dc",
+  "activeVersionId": "4eed9c7c-787c-44c3-8055-390a665873dc",
+  "versionCounter": 1,
+  "triggerCount": 0,
+  "sourceWorkflowId": null,
+  "tags": [],
+  "shared": [
+    {
+      "updatedAt": "2026-11-02T14:06:38.598Z",
+      "createdAt": "2026-11-02T14:06:38.598Z",
+      "role": "workflow:owner",
+      "workflowId": "lendloop-error-handler",
+      "projectId": "UnWw2NPeZwSEL2ql",
+      "project": {
+        "updatedAt": "2026-11-02T14:06:15.047Z",
+        "createdAt": "2026-11-02T14:06:15.047Z",
+        "id": "UnWw2NPeZwSEL2ql",
+        "name": "Unnamed Project",
+        "type": "personal",
+        "icon": null,
+        "description": null,
+        "customTelemetryTags": [],
+        "creatorId": "67c76b3d-8814-47fc-844c-fe8caa0b4ab9"
+      }
+    }
+  ],
+  "versionMetadata": {
+    "name": null,
+    "description": null
+  }
+}

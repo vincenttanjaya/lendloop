@@ -1,0 +1,25 @@
+# LendLoop automation stack: a single self-hosted n8n.
+# Usage: cp .env.example .env (fill in values), docker compose up -d, ./import.sh
+# Reset with `docker compose down -v`: the volume keeps the encryption key it was first started with.
+name: lendloop # otherwise the project (and volume) would be named after the folder, "n8n"
+services:
+  n8n:
+    image: docker.n8n.io/n8nio/n8n:2.45.7
+    restart: unless-stopped
+    ports:
+      - "5678:5678"
+    env_file: .env # N8N_ENCRYPTION_KEY, LENDLOOP_WEBHOOK_SECRET, CONVEX_SITE_URL
+    environment:
+      N8N_ENCRYPTION_KEY: ${N8N_ENCRYPTION_KEY:?set N8N_ENCRYPTION_KEY in n8n/.env}
+      NODE_FUNCTION_ALLOW_BUILTIN: crypto # Code nodes sign/verify with require("crypto")
+      N8N_BLOCK_ENV_ACCESS_IN_NODE: "false" # Code/HTTP nodes read $env.LENDLOOP_WEBHOOK_SECRET / $env.CONVEX_SITE_URL
+      CODE_ENABLE_STDOUT: "true" # Code node console.log lines reach `docker compose logs`
+      GENERIC_TIMEZONE: UTC # schedule trigger fires 09:00 UTC; Convex "today" is UTC too
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    volumes:
+      - n8n_data:/home/node/.n8n
+      - ./workflows:/workflows:ro
+
+volumes:
+  n8n_data:

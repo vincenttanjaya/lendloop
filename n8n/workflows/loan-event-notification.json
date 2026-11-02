@@ -1,0 +1,240 @@
+{
+  "updatedAt": "2026-11-02T14:10:32.000Z",
+  "createdAt": "2026-11-02T14:02:26.901Z",
+  "id": "lendloop-loan-event-notification",
+  "name": "LendLoop - Loan event notification",
+  "description": null,
+  "active": true,
+  "isArchived": false,
+  "nodes": [
+    {
+      "id": "7f4112fc-bcae-4f00-b506-e5c412416718",
+      "name": "Loan event webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        0,
+        0
+      ],
+      "webhookId": "0f6d1f5e-5b1e-4f7e-9d0a-6c1f3b2a9e11",
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "lendloop/loan-event",
+        "responseMode": "responseNode",
+        "options": {
+          "rawBody": true
+        }
+      }
+    },
+    {
+      "id": "db78704d-6fd1-4416-9f25-4b1ffae13a59",
+      "name": "Verify signature",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        220,
+        0
+      ],
+      "parameters": {
+        "jsCode": "// Verifies X-LendLoop-Signature = \"sha256=\" + hex(HMAC-SHA256(secret, `${timestamp}.${rawBody}`)).\nconst crypto = require('crypto');\nconst secret = $env.LENDLOOP_WEBHOOK_SECRET;\nif (!secret) throw new Error('LENDLOOP_WEBHOOK_SECRET is not set');\n\nconst item = $input.first();\nconst timestamp = item.json.headers['x-lendloop-timestamp'];\nconst signature = item.json.headers['x-lendloop-signature'];\n// Raw body bytes exactly as Convex signed them (Webhook node option \"Raw Body\").\nconst rawBody = Buffer.from(item.binary?.data?.data ?? '', 'base64').toString('utf8');\n\nlet reason = null;\nif (!timestamp || !signature) {\n  reason = 'missing';\n} else if (!(Math.abs(Date.now() - Number(timestamp)) <= 300000)) {\n  reason = 'stale'; // also rejects non-numeric timestamps (NaN)\n} else {\n  const expected = Buffer.from('sha256=' + crypto.createHmac('sha256', secret).update(`${timestamp}.${rawBody}`).digest('hex'));\n  const given = Buffer.from(String(signature));\n  if (expected.length !== given.length || !crypto.timingSafeEqual(expected, given)) reason = 'mismatch';\n}\n\nconst valid = reason === null;\nreturn [{ json: { valid, reason, payload: valid ? JSON.parse(rawBody) : null } }];"
+      }
+    },
+    {
+      "id": "b720d8fc-d612-47cc-9662-7d333b835604",
+      "name": "Signature valid?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        440,
+        0
+      ],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "id": "dddc16da-f12f-4654-98d4-2691296aa861",
+              "leftValue": "={{ $json.valid }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "b8549c59-bfd8-45c6-b8f9-5d220d1bbcaa",
+      "name": "Compose notification",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        660,
+        -100
+      ],
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "// Uses only the fields the message needs; nothing else from the payload leaves this node.\nconst { event, toolName, startDate, endDate, actorName, recipient } = $json.payload;\nconst dates = `${startDate} to ${endDate}`;\nconst templates = {\n  requested: `${actorName} asked to borrow your ${toolName} (${dates}).`,\n  approved: `${actorName} approved your request for the ${toolName} (${dates}).`,\n  declined: `${actorName} declined your request for the ${toolName} (${dates}).`,\n  cancelled: `${actorName} cancelled their request for your ${toolName} (${dates}).`,\n  returned: `${actorName} marked the ${toolName} as returned.`,\n};\nconst body = templates[event];\nif (!body) throw new Error(`Unknown loan event: ${event}`);\nreturn { json: { to: recipient.clerkId, message: `Hi ${recipient.name}, ${body}` } };"
+      }
+    },
+    {
+      "id": "25d37cd0-ae97-4176-a811-4eaab29fa174",
+      "name": "Mock deliver",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        880,
+        -100
+      ],
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "// ponytail: mock channel. Swap this node for Email/Slack/Discord to deliver for real.\nconsole.log('[LendLoop notify]', $json.to, $json.message);\nreturn { json: { delivered: true } };"
+      }
+    },
+    {
+      "id": "6f13a86e-dddb-45df-81fb-2c77c7c04d4d",
+      "name": "Respond 200",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        1100,
+        -100
+      ],
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "{\n  \"ok\": true\n}",
+        "options": {
+          "responseCode": 200
+        }
+      }
+    },
+    {
+      "id": "edef9d4e-cef7-4583-a7a4-a6839ee46fed",
+      "name": "Respond 401",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        660,
+        100
+      ],
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "{\n  \"error\": \"invalid signature\"\n}",
+        "options": {
+          "responseCode": 401
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Loan event webhook": {
+      "main": [
+        [
+          {
+            "node": "Verify signature",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Verify signature": {
+      "main": [
+        [
+          {
+            "node": "Signature valid?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Signature valid?": {
+      "main": [
+        [
+          {
+            "node": "Compose notification",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Respond 401",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Compose notification": {
+      "main": [
+        [
+          {
+            "node": "Mock deliver",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Mock deliver": {
+      "main": [
+        [
+          {
+            "node": "Respond 200",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "errorWorkflow": "lendloop-error-handler"
+  },
+  "staticData": null,
+  "meta": null,
+  "nodeGroups": [],
+  "pinData": null,
+  "versionId": "a107bb8f-3ff6-4f2a-9165-b6a89c3d88b7",
+  "activeVersionId": "a107bb8f-3ff6-4f2a-9165-b6a89c3d88b7",
+  "versionCounter": 1,
+  "triggerCount": 1,
+  "sourceWorkflowId": null,
+  "tags": [],
+  "shared": [
+    {
+      "updatedAt": "2026-11-02T14:06:38.680Z",
+      "createdAt": "2026-11-02T14:06:38.680Z",
+      "role": "workflow:owner",
+      "workflowId": "lendloop-loan-event-notification",
+      "projectId": "UnWw2NPeZwSEL2ql",
+      "project": {
+        "updatedAt": "2026-11-02T14:06:15.047Z",
+        "createdAt": "2026-11-02T14:06:15.047Z",
+        "id": "UnWw2NPeZwSEL2ql",
+        "name": "Unnamed Project",
+        "type": "personal",
+        "icon": null,
+        "description": null,
+        "customTelemetryTags": [],
+        "creatorId": "67c76b3d-8814-47fc-844c-fe8caa0b4ab9"
+      }
+    }
+  ],
+  "versionMetadata": {
+    "name": null,
+    "description": null
+  }
+}
