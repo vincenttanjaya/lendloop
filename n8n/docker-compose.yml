@@ -14,7 +14,9 @@ services:
       NODE_FUNCTION_ALLOW_BUILTIN: crypto # Code nodes sign/verify with require("crypto")
       N8N_BLOCK_ENV_ACCESS_IN_NODE: "false" # Code/HTTP nodes read $env.LENDLOOP_WEBHOOK_SECRET / $env.CONVEX_SITE_URL
       CODE_ENABLE_STDOUT: "true" # Code node console.log lines reach `docker compose logs`
-      GENERIC_TIMEZONE: UTC # schedule trigger fires 09:00 UTC; Convex "today" is UTC too
+      # Schedule trigger fires 09:00 UTC; Convex "today" is UTC too. n8n stores the next run when the workflow
+      # is first published, so after changing this, reset with `docker compose down -v` and ./import.sh.
+      GENERIC_TIMEZONE: UTC
     extra_hosts:
       - "host.docker.internal:host-gateway"
     volumes:
