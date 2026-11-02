@@ -2,9 +2,7 @@ import { expect, test } from "vitest";
 import { api } from "../_generated/api";
 import type { Id } from "../_generated/dataModel";
 import type { LoanStatus } from "../constants";
-import { admin, alice, bob, newTest } from "./test.setup";
-
-type TestConvex = ReturnType<typeof newTest>;
+import { admin, alice, bob, newTest, signIn, type TestConvex } from "./test.setup";
 
 const drill = {
   name: "Cordless drill",
@@ -13,12 +11,6 @@ const drill = {
   description: "18V, two batteries",
 } as const;
 const rake = { name: "Leaf rake", category: "garden", condition: "worn", description: "" } as const;
-
-async function signIn(t: TestConvex, identity: typeof alice) {
-  const as = t.withIdentity(identity);
-  const userId = await as.mutation(api.users.ensure, {});
-  return { as, userId };
-}
 
 async function insertLoan(t: TestConvex, toolId: Id<"tools">, borrowerId: Id<"users">, status: LoanStatus) {
   await t.run(async (ctx) => {

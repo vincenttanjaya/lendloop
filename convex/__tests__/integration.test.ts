@@ -2,9 +2,7 @@ import { afterEach, beforeEach, expect, test, vi } from "vitest";
 import { internal } from "../_generated/api";
 import type { LoanStatus } from "../constants";
 import { SIGNATURE_HEADER, TIMESTAMP_HEADER, sign, verify } from "../lib/signature";
-import { newTest } from "./test.setup";
-
-type TestConvex = ReturnType<typeof newTest>;
+import { newTest, type TestConvex } from "./test.setup";
 
 const SECRET = "test-secret";
 const WEBHOOK_URL = "http://n8n.test/webhook/lendloop/loan-event";

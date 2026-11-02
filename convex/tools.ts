@@ -3,6 +3,7 @@ import type { Id } from "./_generated/dataModel";
 import { mutation, query, type MutationCtx, type QueryCtx } from "./_generated/server";
 import { categoryValidator, conditionValidator } from "./constants";
 import { isAdminClerkId, requireToolOwner, requireUser } from "./lib/auth";
+import { setLoanStatus } from "./loans";
 
 const toolFields = {
   name: v.string(),
@@ -103,6 +104,17 @@ export const remove = mutation({
     const tool = await ctx.db.get("tools", toolId);
     if (!tool) throw new ConvexError("Not found");
     if (tool.ownerId !== user._id && !isAdminClerkId(user.clerkId)) throw new ConvexError("Forbidden");
+    const loans = await ctx.db
+      .query("loans")
+      .withIndex("by_tool", (q) => q.eq("toolId", toolId))
+      .collect();
+    if (loans.some((loan) => loan.status === "approved")) {
+      throw new ConvexError("Tool is on loan; mark it returned first");
+    }
+    for (const loan of loans) {
+      if (loan.status === "pending") await setLoanStatus(ctx, loan._id, "cancelled", user._id);
+    }
+    // Loans keep their own toolName, so history still reads correctly once the tool is gone.
     await ctx.db.delete("tools", toolId);
     return null;
   },
