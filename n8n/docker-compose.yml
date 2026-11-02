@@ -7,7 +7,8 @@ services:
     image: docker.n8n.io/n8nio/n8n:2.45.7
     restart: unless-stopped
     ports:
-      - "5678:5678"
+      # Loopback only: an unclaimed owner account on a LAN-reachable port would hand out $env secrets.
+      - "127.0.0.1:5678:5678"
     env_file: .env # N8N_ENCRYPTION_KEY, LENDLOOP_WEBHOOK_SECRET, CONVEX_SITE_URL
     environment:
       N8N_ENCRYPTION_KEY: ${N8N_ENCRYPTION_KEY:?set N8N_ENCRYPTION_KEY in n8n/.env}

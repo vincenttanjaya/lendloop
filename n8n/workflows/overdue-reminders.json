@@ -1,5 +1,5 @@
 {
-  "updatedAt": "2026-11-02T14:10:34.000Z",
+  "updatedAt": "2026-11-02T17:55:09.000Z",
   "createdAt": "2026-11-02T14:02:26.973Z",
   "id": "lendloop-overdue-reminders",
   "name": "LendLoop - Overdue reminders",
@@ -78,7 +78,9 @@
             }
           ]
         },
-        "options": {}
+        "options": {
+          "timeout": 10000
+        }
       }
     },
     {
@@ -100,13 +102,27 @@
       }
     },
     {
+      "id": "b7e2f4a1-5c3d-4e8f-9a6b-2d1c0e9f8a73",
+      "name": "Loop over loans",
+      "type": "n8n-nodes-base.splitInBatches",
+      "typeVersion": 3,
+      "position": [
+        880,
+        0
+      ],
+      "parameters": {
+        "batchSize": 1,
+        "options": {}
+      }
+    },
+    {
       "id": "dcf99ad4-c023-4715-a48f-c9ce48fb2ea6",
       "name": "Mock remind",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        880,
-        0
+        1100,
+        100
       ],
       "parameters": {
         "mode": "runOnceForEachItem",
@@ -119,8 +135,8 @@
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        1100,
-        0
+        1320,
+        100
       ],
       "parameters": {
         "mode": "runOnceForEachItem",
@@ -133,8 +149,8 @@
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
       "position": [
-        1320,
-        0
+        1540,
+        100
       ],
       "retryOnFail": true,
       "maxTries": 3,
@@ -159,7 +175,9 @@
         "contentType": "raw",
         "rawContentType": "application/json",
         "body": "={{ $json.body }}",
-        "options": {}
+        "options": {
+          "timeout": 10000
+        }
       }
     }
   ],
@@ -201,7 +219,7 @@
       "main": [
         [
           {
-            "node": "Mock remind",
+            "node": "Loop over loans",
             "type": "main",
             "index": 0
           }
@@ -240,6 +258,29 @@
           }
         ]
       ]
+    },
+    "Loop over loans": {
+      "main": [
+        [],
+        [
+          {
+            "node": "Mock remind",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Record reminder": {
+      "main": [
+        [
+          {
+            "node": "Loop over loans",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     }
   },
   "settings": {
@@ -250,29 +291,29 @@
   "meta": null,
   "nodeGroups": [],
   "pinData": null,
-  "versionId": "7e098750-621f-419e-a45c-a08050888a12",
-  "activeVersionId": "7e098750-621f-419e-a45c-a08050888a12",
+  "versionId": "a5c72aab-0f07-4a2d-ace6-54f2fdb03e82",
+  "activeVersionId": "a5c72aab-0f07-4a2d-ace6-54f2fdb03e82",
   "versionCounter": 2,
   "triggerCount": 1,
   "sourceWorkflowId": null,
   "tags": [],
   "shared": [
     {
-      "updatedAt": "2026-11-02T14:06:38.775Z",
-      "createdAt": "2026-11-02T14:06:38.775Z",
+      "updatedAt": "2026-11-02T17:54:56.302Z",
+      "createdAt": "2026-11-02T17:54:56.302Z",
       "role": "workflow:owner",
       "workflowId": "lendloop-overdue-reminders",
-      "projectId": "UnWw2NPeZwSEL2ql",
+      "projectId": "ou5Pla3sk4uXaaMK",
       "project": {
-        "updatedAt": "2026-11-02T14:06:15.047Z",
-        "createdAt": "2026-11-02T14:06:15.047Z",
-        "id": "UnWw2NPeZwSEL2ql",
+        "updatedAt": "2026-11-02T17:54:29.360Z",
+        "createdAt": "2026-11-02T17:54:29.360Z",
+        "id": "ou5Pla3sk4uXaaMK",
         "name": "Unnamed Project",
         "type": "personal",
         "icon": null,
         "description": null,
         "customTelemetryTags": [],
-        "creatorId": "67c76b3d-8814-47fc-844c-fe8caa0b4ab9"
+        "creatorId": "f186e54e-3df8-44dc-8224-4717a2c85d1f"
       }
     }
   ],
