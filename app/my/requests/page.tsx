@@ -21,7 +21,12 @@ export default function MyRequestsPage() {
           loan.status === "pending" ? (
             <ActionButton label="Cancel request" onClick={() => cancel({ loanId: loan._id })} />
           ) : loan.status === "approved" ? (
-            <ActionButton label="Mark returned" primary onClick={() => markReturned({ loanId: loan._id })} />
+            <ActionButton
+              label="Mark returned"
+              primary
+              confirmText="Mark this loan returned? This can't be undone."
+              onClick={() => markReturned({ loanId: loan._id })}
+            />
           ) : null
         }
       />

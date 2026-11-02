@@ -6,6 +6,7 @@ import { ErrorText, useMutationError } from "@/components/error-text";
 import { api } from "@/convex/_generated/api";
 import type { Id } from "@/convex/_generated/dataModel";
 import { CATEGORIES, type Category } from "@/convex/constants";
+import { todayISO } from "@/convex/lib/dates";
 import { card, field, pill, primaryButton } from "@/lib/ui";
 
 export default function ToolsPage() {
@@ -31,7 +32,7 @@ export default function ToolsPage() {
       {tools === undefined ? (
         <p className="text-zinc-500">Loading…</p>
       ) : tools.length === 0 ? (
-        <p className="text-zinc-500">No tools in this category yet.</p>
+        <p className="text-zinc-500">{category ? "No tools in this category yet." : "No tools listed yet."}</p>
       ) : (
         <ul className="space-y-3">
           {tools.map((tool) => (
@@ -66,7 +67,7 @@ function RequestForm({ toolId }: { toolId: Id<"tools"> }) {
   const { error, pending, run } = useMutationError();
   const [dates, setDates] = useState({ startDate: "", endDate: "" });
   const [sent, setSent] = useState(false);
-  const today = new Date().toISOString().slice(0, 10); // UTC, matching the server's "today"
+  const today = todayISO(); // the server's own "today" (UTC)
 
   if (sent) return <p className="text-sm text-emerald-700">Request sent. Track it under My requests.</p>;
   return (

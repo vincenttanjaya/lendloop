@@ -12,6 +12,11 @@ export function ErrorText({ error }: { error: string | null }) {
   );
 }
 
+/** ConvexError carries our plain-English message; anything else is a bug or outage, so stay generic. */
+export function errorMessage(e: unknown): string {
+  return e instanceof ConvexError ? String(e.data) : "Something went wrong.";
+}
+
 /** Runs a mutation and keeps its failure as plain text for <ErrorText>; `run` resolves to true on success. */
 export function useMutationError() {
   const [error, setError] = useState<string | null>(null);
@@ -23,8 +28,7 @@ export function useMutationError() {
       await fn();
       return true;
     } catch (e) {
-      // ConvexError carries our plain-English message; anything else is a bug or outage, so stay generic.
-      setError(e instanceof ConvexError ? String(e.data) : "Something went wrong. Please try again.");
+      setError(errorMessage(e));
       return false;
     } finally {
       setPending(false);
